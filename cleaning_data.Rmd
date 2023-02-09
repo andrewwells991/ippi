@@ -1,0 +1,201 @@
+---
+title: "Untitled"
+author: "Andrew Wells"
+date: "1/13/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#install.packages("tidyverse")
+#install.packages("readr")
+
+library(tidyverse)
+library(readr)
+```
+
+```{r}
+#Data must be loaded manually
+
+#Resetting df name
+df <- ippi_2023_01_16
+```
+
+```{r}
+#Column that counts the number of NAs in each row
+
+df$na_count <- apply(df, 1, function(x) sum(is.na(x)))
+```
+
+#Cleaning data
+
+##Cleaning/creating dates columns
+```{r}
+#Setting variables as dates
+df$period.startDate <- as.Date(df$period.startDate)
+df$period.endDate <- as.Date(df$period.endDate)
+df$period.maxExtentDate <- as.Date(df$period.maxExtentDate)
+
+#Creating variables for planned project duration and extension period
+df <- df %>%
+  mutate(planned_proj_days = difftime(period.endDate, period.startDate, units = "days")) %>%
+  mutate(max_extend_days = difftime(period.maxExtentDate, period.endDate, units = "days"))
+  
+#Setting planning project days to numeric
+df$planned_proj_days <- as.numeric(df$planned_proj_days)
+
+#Setting extension period as numeric
+df$max_extend_days <- as.numeric(df$max_extend_days)
+df["max_extend_days"][is.na(df["max_extend_days"])] <- 0
+df$max_extend_days <- as.numeric(df$max_extend_days)
+
+#Creating variable for total project period (planned + extension)
+df <- df %>%
+  mutate(total_proj_days = planned_proj_days + max_extend_days)
+
+#Setting budget date variables as dates
+df$budget.requestDate <- as.Date(df$budget.requestDate)
+df$budget.approvalDate <- as.Date(df$budget.approvalDate)
+
+#Creating a budget approval timeline variable
+df <- df %>%
+  mutate(budget_approval_days = difftime(budget.approvalDate, budget.requestDate, units = "days"))
+
+#Setting variables as numeric
+df$budget_approval_days <- as.numeric(df$budget_approval_days)
+df$total_proj_days <- as.numeric(df$total_proj_days)
+```
+
+##Cleaning sectors column
+```{r}
+#Removing punctuation
+df$sector <- gsub("\\[|\\]", "", df$sector)
+df$sector <- gsub("'","", df$sector)
+
+#Changing variable names
+df$sector <- str_replace(df$sector, "transport.road", "transportRoad")
+df$sector <- str_replace(df$sector, "transport.urban", "transportUrban")
+
+#Separating sector
+df <- df %>% 
+  separate(sector, c("sector_1", "sector_2", "sector_3", "sector_4", "sector_5"))
+
+#Creating columns based on sectors
+df <- df %>%
+  mutate(agriculture = ifelse(sector_1 == "agriculture" | sector_2 == "agriculture" | sector_3 == "agriculture" |
+                                 sector_4 == "agriculture" | sector_5 == "agriculture", 1, 0)) %>%
+  mutate(communications = ifelse(sector_1 == "communications" | sector_2 == "communications" | sector_3 == "communications" |
+                                   sector_4 == "communications" | sector_5 == "communications", 1, 0)) %>%
+  mutate(cultureSportsAndRecreation = ifelse(sector_1 == "cultureSportsAndRecreation" | sector_2 == "cultureSportsAndRecreation" | sector_3 == "cultureSportsAndRecreation" |
+                                   sector_4 == "cultureSportsAndRecreation" | sector_5 == "cultureSportsAndRecreation", 1, 0)) %>%
+  mutate(economy = ifelse(sector_1 == "economy" | sector_2 == "economy" | sector_3 == "economy" |
+                                   sector_4 == "economy" | sector_5 == "economy", 1, 0)) %>%
+  mutate(education = ifelse(sector_1 == "education" | sector_2 == "education" | sector_3 == "education" |
+                                   sector_4 == "education" | sector_5 == "education", 1, 0)) %>%
+  mutate(energy = ifelse(sector_1 == "energy" | sector_2 == "energy" | sector_3 == "energy" |
+                                   sector_4 == "energy" | sector_5 == "energy", 1, 0)) %>%
+  mutate(governance = ifelse(sector_1 == "governance" | sector_2 == "governance" | sector_3 == "governance" |
+                                   sector_4 == "governance" | sector_5 == "governance", 1, 0)) %>%
+  mutate(health = ifelse(sector_1 == "health" | sector_2 == "health" | sector_3 == "health" |
+                                   sector_4 == "health" | sector_5 == "health", 1, 0)) %>%
+  mutate(socialHousing = ifelse(sector_1 == "socialHousing" | sector_2 == "socialHousing" | sector_3 == "socialHousing" |
+                                   sector_4 == "socialHousing" | sector_5 == "socialHousing", 1, 0)) %>%
+  mutate(transport = ifelse(sector_1 == "transport" | sector_2 == "transport" | sector_3 == "transport" |
+                                   sector_4 == "transport" | sector_5 == "transport", 1, 0)) %>%
+  mutate(transportRoad = ifelse(sector_1 == "transportRoad" | sector_2 == "transportRoad" | sector_3 == "transportRoad" |
+                                   sector_4 == "transportRoad" | sector_5 == "transportRoad", 1, 0)) %>%
+  mutate(transportUrban = ifelse(sector_1 == "transportUrban" | sector_2 == "transportUrban" | sector_3 == "transportUrban" |
+                                   sector_4 == "transportUrban" | sector_5 == "transportUrban", 1, 0)) %>%
+  mutate(waterAndWaste = ifelse(sector_1 == "waterAndWaste" | sector_2 == "waterAndWaste" | sector_3 == "waterAndWaste" |
+                                   sector_4 == "waterAndWaste" | sector_5 == "waterAndWaste", 1, 0))
+```
+  
+##Cleaning/creating budget columns
+```{r}
+#Creating common currency column
+
+df$budget.amount.amount <- format(df$budget.amount.amount, scientific = FALSE)
+df$budget.amount.amount <- as.numeric(df$budget.amount.amount)
+
+df$amount_mwk <- ifelse(df$budget.amount.currency == "MWK", df$budget.amount.amount, df$budget.amount.amount * 1000)
+df$amount_mwk <- format(df$amount_mwk, scientific = FALSE)
+df$amount_mwk <- as.numeric(df$amount_mwk)
+
+df$amount_usd_eur <- df$amount_mwk / 1000
+
+#Creating over budget column
+df$budget.amount.amount <- as.numeric(df$budget.amount.amount)
+df$completion.finalValue.amount <- as.numeric(df$completion.finalValue.amount)
+
+df$budget.amount.amount <- round(df$budget.amount.amount, digits = 0)
+df$completion.finalValue.amount <- round(df$completion.finalValue.amount, digits = 0)
+
+df <- df %>%
+  mutate(over_budget = completion.finalValue.amount - budget.amount.amount)
+```
+
+##Cleaning/creating regions column
+```{r}
+
+df_locations <- df %>%
+  select(locations)
+
+#Cleaning data
+d <- gsub(".*'region':","", df_locations$locations)
+
+f <- as.data.frame(d)
+
+g <- gsub('[[:punct:] ]+',' ', f$d)
+
+h <- as.data.frame(g)
+
+h$region <- gsub("([A-Za-z]+).*", "\\1", h$g)
+
+#Binding with main dataframe
+df <- cbind(df, h)
+```
+
+##Cleaning/creating coordinates column
+```{r}
+#Creating coordinates column
+
+d <- gsub(".*'coordinates':","", df_locations$locations)
+
+f <- as.data.frame(d)
+
+g <- sub(" 'address'.*", "", f$d) 
+
+h <- as.data.frame(g)
+
+h$coordinates <- ifelse(grepl("id", h$g), NA, h$g)
+
+h <- h %>%
+  select(coordinates)
+
+h$coordinates <- gsub("},","",h$coordinates)
+
+#Remove all coordinates after first listing
+h$coords_2 <- sub("^([^,]*,[^,]*),.*", "\\1", h$coordinates)
+
+#Remove brackets
+h$coords_2 <- gsub("\\[|\\]", "", h$coords_2)
+
+#Extract values from coordinates variable to make lat and long variables
+
+h$long <- sub(",.*", "", h$coords_2)
+h$lat <- sub(".*, ", "", h$coords_2) 
+
+#Joining coordinates df with full df
+df <- cbind(df, h)
+```
+
+##Final cleaning of df
+```{r}
+df <- df %>%
+  select(-c(g))
+```
+
+```{r}
+write.csv(df, "/Users/andrewwells/Desktop/Jobs/Malawi/Project Implementation/Initiatives:project components/IPPI/ippi_report/data/ippi.csv")
+```

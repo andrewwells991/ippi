@@ -1,0 +1,156 @@
+---
+title: "Untitled"
+author: "Andrew Wells"
+date: "1/17/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+df <- read_csv("~/Desktop/Jobs/Malawi/Project Implementation/Initiatives:project components/IPPI/ippi_report/data/ippi.csv")
+```
+
+
+```{r}
+#Creating party column
+
+#Examining parties variable
+df$parties
+
+#Creating dataframe with just parties
+df_parties <- df %>%
+  select(parties)
+
+#Splitting df so each row is a different party
+a <- str_split(df_parties, "'id':")
+b <- as.data.frame(a)
+
+#Renaming column
+colnames(b) <- c("party") 
+
+#Deleting all text between "address" and "role"
+c <- gsub("(?<=address).*(?=role)", " ", b$party, perl = TRUE)
+d <- as.data.frame(c)
+d
+
+#Deleting all quotation marks
+d$c <- gsub("'","",d$c)
+
+#Deleting all text before the party name
+d$c <- gsub(".*name:", "", d$c)
+
+#Deleting certain unimportant words
+d$c <- str_remove_all(d$c, "address")
+d$c <- str_remove_all(d$c, "role")
+d$c <- str_remove_all(d$c, "s:")
+
+#Creating new variable with just the function of each party
+d$e <- sub("^.*?,", "", d$c)
+
+#Deleting all commas
+d$c <- gsub(",.*","",d$c)
+
+#Deleting all punctuation
+d$f <- gsub('[[:punct:]]+','', d$e)
+
+#Making different columns for the different roles of each party
+g <- d %>% 
+  separate(f, c("role", "role_1", "role_2", "role_3", "role_4", "role_5")) %>%
+  select(-c("role", "e"))
+
+#Deleting rows with NA for role_1 (no info)
+g <- g %>% 
+  drop_na(role_1)
+
+#Making additional rows to cbind
+pat <- paste0("\\b", "id", "\\b", collapse = "|")    
+
+m <- df %>%
+  mutate(proj2 = stringr::str_extract_all(parties, pat)) %>% 
+  tidyr::unnest(proj2) %>%
+  drop_na(parties)
+
+m <- m %>%
+  mutate(proj_num = ...1 + 1)
+  
+g <- g %>%  
+  slice(-1)
+
+#Rename "c" column to "party
+g <- g %>%
+  rename(party = "c")
+```
+
+
+
+```{r}
+#Creating columns for each role
+
+g <- g %>%
+  mutate(administrativeEntity = ifelse(role_1 == "administrativeEntity" | role_2 == "administrativeEntity" | role_3 == "administrativeEntity" |
+                                 role_4 == "administrativeEntity" | role_5 == "administrativeEntity", 1, 0)) %>%
+  mutate(buyer = ifelse(role_1 == "buyer" | role_2 == "buyer" | role_3 == "buyer" |
+                                   role_4 == "buyer" | role_5 == "buyer", 1, 0)) %>%
+  mutate(email = ifelse(role_1 == "email" | role_2 == "email" | role_3 == "email" |
+                                   role_4 == "email" | role_5 == "email", 1, 0)) %>%
+  mutate(funder = ifelse(role_1 == "funder" | role_2 == "funder" | role_3 == "funder" |
+                                   role_4 == "funder" | role_5 == "funder", 1, 0)) %>%
+  mutate(interestedParty = ifelse(role_1 == "interestedParty" | role_2 == "interestedParty" | role_3 == "interestedParty" |
+                                   role_4 == "interestedParty" | role_5 == "interestedParty", 1, 0)) %>%
+  mutate(payee = ifelse(role_1 == "payee" | role_2 == "payee" | role_3 == "payee" |
+                                   role_4 == "payee" | role_5 == "payee", 1, 0)) %>%
+  mutate(payer = ifelse(role_1 == "payer" | role_2 == "payer" | role_3 == "payer" |
+                                   role_4 == "payer" | role_5 == "payer", 1, 0)) %>%
+  mutate(procuringEntity = ifelse(role_1 == "procuringEntity" | role_2 == "procuringEntity" | role_3 == "procuringEntity" |
+                                   role_4 == "procuringEntity" | role_5 == "procuringEntity", 1, 0)) %>%
+  mutate(supplier = ifelse(role_1 == "supplier" | role_2 == "supplier" | role_3 == "supplier" |
+                                   role_4 == "supplier" | role_5 == "supplier", 1, 0)) %>%
+  mutate(tenderer = ifelse(role_1 == "tenderer" | role_2 == "tenderer" | role_3 == "tenderer" |
+                                   role_4 == "tenderer" | role_5 == "tenderer", 1, 0))
+```
+
+```{r}
+#Creating columns for party names in roles
+
+g <- g %>%
+  mutate(administrativeEntity_name = ifelse(role_1 == "administrativeEntity" | role_2 == "administrativeEntity" | role_3 == "administrativeEntity" |
+                                 role_4 == "administrativeEntity" | role_5 == "administrativeEntity", g$party, 0)) %>%
+  mutate(buyer_name = ifelse(role_1 == "buyer" | role_2 == "buyer" | role_3 == "buyer" |
+                                   role_4 == "buyer" | role_5 == "buyer", g$party, 0)) %>%
+  mutate(email_name = ifelse(role_1 == "email" | role_2 == "email" | role_3 == "email" |
+                                   role_4 == "email" | role_5 == "email", g$party, 0)) %>%
+  mutate(funder_name = ifelse(role_1 == "funder" | role_2 == "funder" | role_3 == "funder" |
+                                   role_4 == "funder" | role_5 == "funder", g$party, 0)) %>%
+  mutate(interestedParty_name = ifelse(role_1 == "interestedParty" | role_2 == "interestedParty" | role_3 == "interestedParty" |
+                                   role_4 == "interestedParty" | role_5 == "interestedParty", g$party, 0)) %>%
+  mutate(payee_name = ifelse(role_1 == "payee" | role_2 == "payee" | role_3 == "payee" |
+                                   role_4 == "payee" | role_5 == "payee", g$party, 0)) %>%
+  mutate(payer_name = ifelse(role_1 == "payer" | role_2 == "payer" | role_3 == "payer" |
+                                   role_4 == "payer" | role_5 == "payer", g$party, 0)) %>%
+  mutate(procuringEntity_name = ifelse(role_1 == "procuringEntity" | role_2 == "procuringEntity" | role_3 == "procuringEntity" |
+                                   role_4 == "procuringEntity" | role_5 == "procuringEntity", g$party, 0)) %>%
+  mutate(supplier_name = ifelse(role_1 == "supplier" | role_2 == "supplier" | role_3 == "supplier" |
+                                   role_4 == "supplier" | role_5 == "supplier", g$party, 0)) %>%
+  mutate(tenderer_name = ifelse(role_1 == "tenderer" | role_2 == "tenderer" | role_3 == "tenderer" |
+                                   role_4 == "tenderer" | role_5 == "tenderer", g$party, 0))
+```
+
+```{r}
+#Combining columns
+party <- cbind(m, g)
+```
+
+```{r}
+#Check if any party is working twice on same project
+party %>%
+  group_by(title) %>%
+  distinct(party, .keep_all=TRUE)
+```
+
+```{r}
+write.csv(party, "/Users/andrewwells/Desktop/Jobs/Malawi/Project Implementation/Initiatives:project components/IPPI/ippi_report/data/party_df.csv")
+```
+
